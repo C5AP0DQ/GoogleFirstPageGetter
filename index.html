@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Google First Page Extractor</title>
+<style>
+	#inputdiv { margin: 2em; }
+	input { width: 300px; margin-right: 18px; }
+	button { padding: 0.5em; }
+	pre { background: #f4f4f4; padding: 1em; white-space: pre-wrap; margin-top: 1em; }
+</style>
+</head>
+<body>
+
+<div id="inputdiv">
+	<div>Get First Google Page</div>
+	<input id="inputTextBox" type="text" placeholder="Enter search query">
+		<div  style="display:inline-block;">  
+			<button style="position:relative; float:left" id="searchNSaveBtn">Search&Save</button>
+			<div style="position:relative; float:left; transform:translateY(25%);"><--- this will search and download the result right away</div>
+			<button style="position:absolute; float:right; z-index:1; display:inline-block; margin-top:0; transform:translateY(-50%);" id="toggleQUnitBtn">Toggle Unit Tests</button>
+		</div>
+	</input>
+</div>
+<pre id="output" style="max-height:calc(100vh - 200px); overflow-y:auto; overflow-x:auto;"></pre>
+
+<script>
+	
+	var trimAndValidateQuery = function(query) {
+	    const trimmed = query.trim();
+		if (!trimmed) throw new Error('No query entered');
+		return trimmed;
+	}
+	
+	var queryWrapper = function(query){
+		try{
+			return trimAndValidateQuery(query);
+		}catch(error){
+			alert(error.message);
+			return null;
+		}
+	}
+	
+	var getCountryCode = function (locale = 'en-US') {
+		return locale.split('-').length === 2 ? locale.split('-')[1] : 'US';
+	}
+	
+	var getResponse = async function(url){
+		try{
+			const response = await fetch(url);
+			return response;
+		}catch(error){
+			console.error('Error fetching search results:', error);
+			alert('Error fetching search results: ' + error.message);
+			return null;
+		}
+	}
+	
+	var getData = async function(response){
+		try{
+			const data = await response.json();
+			return data;
+		}catch(error){
+			console.error('Error translating response into json data:', error);
+			alert('Error translating response into json data: ' + error.message);
+			return undefined;
+		}
+	}
+	
+	
+	var checkForAPIError = function(data){
+		try{
+			// Check for API error
+			if (data.error) {
+				throw new Error(data.error.message);
+				return true;
+			}
+		}catch(error){
+			console.error('Google API Error:', error);
+			alert('Google API Error: ' + error.message);
+			return false;
+		}
+	};
+	
+	var getOrganicResults = function(data){
+		try{
+			// Extract only organic results
+			const results = (data.items || []).map(item => ({
+				title: item.title,
+				link: item.link,
+				snippet: item.snippet
+			}));
+			return results;
+		}catch(error){
+			console.error('Error getting organic search results:', error);
+			alert('Error getting organic search results: ' + error.message);
+			return [];
+		}
+	};
+
+	var save = function(results){
+		try{
+			// Save results as JSON file
+			const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' });
+			const downloadLink = document.createElement('a');
+			downloadLink.href = URL.createObjectURL(blob);
+			downloadLink.download = 'results.json';
+			downloadLink.click();
+		}catch(error){
+			console.error('Error saving results:', error);
+			alert('Error saving results: ' + error.message);
+		}
+	};
+	
+	
+	// Your API key and CSE ID
+	const apiKey = 'AIzaSyC8KC6s2D4669eY4Nro0Jpt_Jen_eATMQg';
+	const cx = '20dcb38295ef7441d';
+
+	document.getElementById('searchNSaveBtn').addEventListener('click', async () => {
+		const query = queryWrapper(document.getElementById('inputTextBox').value);
+		if (!query) return;
+		const locale = navigator.language || navigator.userLanguage || 'en-US';
+		const countryCode = getCountryCode(locale);
+
+		// URL following official Google Custom Search JSON API format
+		const url = `https://www.googleapis.com/customsearch/v1?key=${encodeURIComponent(apiKey)}&cx=${encodeURIComponent(cx)}&q=${encodeURIComponent(query)}&num=10&gl=${countryCode}&cr=country${countryCode}`;
+		
+		console.log(url);
+		const response = await getResponse(url);
+		const data = await getData(response);
+		checkForAPIError(data);
+		const organicResults = getOrganicResults(data);
+		document.getElementById('output').textContent = JSON.stringify(organicResults, null, 2);
+		save(organicResults);
+		
+	});
+  
+</script>
+
+
+<!-- QUnit CSS and JS -->
+<link rel="stylesheet" href="https://code.jquery.com/qunit/qunit-2.21.0.css">
+<script src="https://code.jquery.com/qunit/qunit-2.21.0.js"></script>
+
+<div id="qunitPanel" style="position:fixed; bottom:0; right:0; width:400px; max-height:50%; background:#f0f0f0; border:1px solid #ccc; overflow:auto;display:none;">
+  
+    <div id="qunit"></div>
+    <div id="qunit-fixture"></div>
+</div>
+
+<script>
+const panel = document.getElementById('qunitPanel');
+document.getElementById('toggleQUnitBtn').addEventListener('click', () => {
+    panel.style.display = (panel.style.display === 'none' ? 'inline' : 'none');
+});
+</script>
+<script>
+QUnit.module('Logic Functions');
+
+QUnit.test('trimAndValidateQuery', function(assert) {
+    assert.equal(trimAndValidateQuery('  hello '), 'hello', 'Trims whitespace correctly');
+
+    assert.throws(() => trimAndValidateQuery('   '), /No query entered/, 'Throws error on empty string');
+});
+
+QUnit.test('queryWrapper', function(assert) {
+    let called = false;
+    window.alert = function(msg){ called = msg; }; // mock alert
+
+    const result = queryWrapper('  test ');
+    assert.equal(result, 'test', 'Returns trimmed string');
+
+    const result2 = queryWrapper('   ');
+    assert.equal(result2, null, 'Returns null for empty string');
+    assert.equal(called, 'No query entered', 'Alerts with correct message');
+});
+
+QUnit.test('getCountryCode', function(assert) {
+    assert.equal(getCountryCode('en-US'), 'US', 'Parses US correctly');
+    assert.equal(getCountryCode('cs-CZ'), 'CZ', 'Parses CZ correctly');
+	assert.equal(getCountryCode('cs-CZ-CZ'), 'US', 'Defaults to US correctly');
+    assert.equal(getCountryCode(), 'US', 'Defaults to US');
+});
+
+QUnit.test('getOrganicResults', function(assert) {
+    const sampleData = {
+        items: [
+            { title: 'A', link: 'a.com', snippet: 'aaa' },
+            { title: 'B', link: 'b.com', snippet: 'bbb' }
+        ]
+    };
+    const results = getOrganicResults(sampleData);
+	
+    assert.deepEqual(results, sampleData.items, 'Returns items array correctly');
+
+    const emptyResults = getOrganicResults({});
+    assert.deepEqual(emptyResults, [], 'Returns empty array if no items');
+});
+</script>
+</body>
+</html>
