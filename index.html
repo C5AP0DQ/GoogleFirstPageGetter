@@ -166,8 +166,10 @@ QUnit.test('trimAndValidateQuery', function(assert) {
 
 QUnit.test('queryWrapper', function(assert) {
     let called = false;
+	let originalAlert = window.alert;
     window.alert = function(msg){ called = msg; }; // mock alert
-
+	window.alert = originalAlert;
+	
     const result = queryWrapper('  test ');
     assert.equal(result, 'test', 'Returns trimmed string');
 
