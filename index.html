@@ -168,7 +168,6 @@ QUnit.test('queryWrapper', function(assert) {
     let called = false;
 	let originalAlert = window.alert;
     window.alert = function(msg){ called = msg; }; // mock alert
-	window.alert = originalAlert;
 	
     const result = queryWrapper('  test ');
     assert.equal(result, 'test', 'Returns trimmed string');
@@ -176,6 +175,7 @@ QUnit.test('queryWrapper', function(assert) {
     const result2 = queryWrapper('   ');
     assert.equal(result2, null, 'Returns null for empty string');
     assert.equal(called, 'No query entered', 'Alerts with correct message');
+	window.alert = originalAlert;
 });
 
 QUnit.test('getCountryCode', function(assert) {
